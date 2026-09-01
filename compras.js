@@ -3,6 +3,9 @@
  * Handles clients, suppliers, products, costs, stock, orders, and pricing
  */
 
+import { db, auth, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy } from './firebase-config.js';
+import { formatCPFCNPJ, showToast, generateCode } from './utils.js';
+
 // ============================================
 // IMPORTAR EXCEL
 // ============================================
@@ -69,10 +72,7 @@ async function importarProdutosExcel() {
                         updated_at: new Date().toISOString()
                     };
 
-                    await db.collection('users')
-                        .doc(user.uid)
-                        .collection('products')
-                        .add(dados);
+                    await addDoc(collection(db, 'users', user.uid, 'products'), dados);
                     
                     successCount++;
                 } catch (error) {
@@ -126,11 +126,9 @@ async function loadClientes() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('clients')
-            .orderBy('name')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'clients'), orderBy('name'))
+        );
 
         const tbody = document.getElementById('clientesTable') || document.getElementById('tabelaClientes');
         if (!tbody) return;
@@ -183,14 +181,10 @@ async function openClienteModal(clienteId = null, edit = false) {
 
     if (edit && clienteId) {
         const user = auth.currentUser;
-        const doc = await db.collection('users')
-            .doc(user.uid)
-            .collection('clients')
-            .doc(clienteId)
-            .get();
+        const docSnap = await getDoc(doc(db, 'users', user.uid, 'clients', clienteId));
 
-        if (doc.exists) {
-            const cliente = doc.data();
+        if (docSnap.exists()) {
+            const cliente = docSnap.data();
             document.getElementById('clienteNome').value = cliente.name || '';
             document.getElementById('clienteCPFCNPJ').value = cliente.cpf_cnpj || '';
             document.getElementById('clienteCEP').value = cliente.cep || '';
@@ -240,19 +234,12 @@ async function salvarCliente(clienteId = null) {
 
     try {
         if (clienteId) {
-            await db.collection('users')
-                .doc(user.uid)
-                .collection('clients')
-                .doc(clienteId)
-                .update(dados);
+            await updateDoc(doc(db, 'users', user.uid, 'clients', clienteId), dados);
             showToast('Cliente atualizado com sucesso', 'success');
         } else {
             dados.codigo = generateCode('CLI');
             dados.created_at = new Date().toISOString();
-            await db.collection('users')
-                .doc(user.uid)
-                .collection('clients')
-                .add(dados);
+            await addDoc(collection(db, 'users', user.uid, 'clients'), dados);
             showToast('Cliente criado com sucesso', 'success');
         }
 
@@ -271,11 +258,7 @@ async function deletarCliente(clienteId) {
     if (!user) return;
 
     try {
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('clients')
-            .doc(clienteId)
-            .delete();
+        await deleteDoc(doc(db, 'users', user.uid, 'clients', clienteId));
 
         showToast('Cliente deletado com sucesso', 'success');
         loadClientes();
@@ -294,11 +277,9 @@ async function loadFornecedores() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('suppliers')
-            .orderBy('name')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'suppliers'), orderBy('name'))
+        );
 
         const tbody = document.getElementById('fornecedoresTable') || document.getElementById('tabelaFornecedores');
         if (!tbody) return;
@@ -351,14 +332,10 @@ async function openFornecedorModal(fornecedorId = null, edit = false) {
 
     if (edit && fornecedorId) {
         const user = auth.currentUser;
-        const doc = await db.collection('users')
-            .doc(user.uid)
-            .collection('suppliers')
-            .doc(fornecedorId)
-            .get();
+        const docSnap = await getDoc(doc(db, 'users', user.uid, 'suppliers', fornecedorId));
 
-        if (doc.exists) {
-            const fornecedor = doc.data();
+        if (docSnap.exists()) {
+            const fornecedor = docSnap.data();
             document.getElementById('fornecedorNome').value = fornecedor.name || '';
             document.getElementById('fornecedorCPFCNPJ').value = fornecedor.cpf_cnpj || '';
             document.getElementById('fornecedorIE').value = fornecedor.state_registration || '';
@@ -409,19 +386,12 @@ async function salvarFornecedor(fornecedorId = null) {
 
     try {
         if (fornecedorId) {
-            await db.collection('users')
-                .doc(user.uid)
-                .collection('suppliers')
-                .doc(fornecedorId)
-                .update(dados);
+            await updateDoc(doc(db, 'users', user.uid, 'suppliers', fornecedorId), dados);
             showToast('Fornecedor atualizado com sucesso', 'success');
         } else {
             dados.codigo = generateCode('FOR');
             dados.created_at = new Date().toISOString();
-            await db.collection('users')
-                .doc(user.uid)
-                .collection('suppliers')
-                .add(dados);
+            await addDoc(collection(db, 'users', user.uid, 'suppliers'), dados);
             showToast('Fornecedor criado com sucesso', 'success');
         }
 
@@ -440,11 +410,7 @@ async function deletarFornecedor(fornecedorId) {
     if (!user) return;
 
     try {
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('suppliers')
-            .doc(fornecedorId)
-            .delete();
+        await deleteDoc(doc(db, 'users', user.uid, 'suppliers', fornecedorId));
 
         showToast('Fornecedor deletado com sucesso', 'success');
         loadFornecedores();
@@ -463,11 +429,9 @@ async function loadProdutos() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('products')
-            .orderBy('name')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'products'), orderBy('name'))
+        );
 
         const tbody = document.getElementById('produtosTable') || document.getElementById('tabelaProdutos');
         if (!tbody) return;
@@ -515,10 +479,7 @@ async function openProdutoModal(produtoId = null, edit = false) {
     }
 
     // Carregar fornecedores
-    const snapshot = await db.collection('users')
-        .doc(user.uid)
-        .collection('suppliers')
-        .get();
+    const snapshot = await getDocs(collection(db, 'users', user.uid, 'suppliers'));
 
     const select = document.getElementById('produtoFornecedor');
     select.innerHTML = '';
@@ -535,14 +496,10 @@ async function openProdutoModal(produtoId = null, edit = false) {
     document.getElementById('produtoModalTitle').textContent = 'Novo Produto';
 
     if (edit && produtoId) {
-        const doc = await db.collection('users')
-            .doc(user.uid)
-            .collection('products')
-            .doc(produtoId)
-            .get();
+        const docSnap = await getDoc(doc(db, 'users', user.uid, 'products', produtoId));
 
-        if (doc.exists) {
-            const produto = doc.data();
+        if (docSnap.exists()) {
+            const produto = docSnap.data();
             document.getElementById('produtoNome').value = produto.name || '';
             document.getElementById('produtoNCM').value = produto.ncm || '';
             document.getElementById('produtoIPI').value = produto.ipi || '';
@@ -608,19 +565,12 @@ async function salvarProduto(produtoId = null) {
 
     try {
         if (produtoId) {
-            await db.collection('users')
-                .doc(user.uid)
-                .collection('products')
-                .doc(produtoId)
-                .update(dados);
+            await updateDoc(doc(db, 'users', user.uid, 'products', produtoId), dados);
             showToast('Produto atualizado com sucesso', 'success');
         } else {
             dados.codigo = generateCode('PRD');
             dados.created_at = new Date().toISOString();
-            await db.collection('users')
-                .doc(user.uid)
-                .collection('products')
-                .add(dados);
+            await addDoc(collection(db, 'users', user.uid, 'products'), dados);
             showToast('Produto criado com sucesso', 'success');
         }
 
@@ -639,11 +589,7 @@ async function deletarProduto(produtoId) {
     if (!user) return;
 
     try {
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('products')
-            .doc(produtoId)
-            .delete();
+        await deleteDoc(doc(db, 'users', user.uid, 'products', produtoId));
 
         showToast('Produto deletado com sucesso', 'success');
         loadProdutos();

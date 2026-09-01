@@ -421,3 +421,34 @@ function throttle(func, delay) {
         }
     };
 }
+
+// Exportar funções para uso em outros módulos
+export {
+    formatCurrency,
+    formatDate,
+    formatDateTime,
+    formatCPFCNPJ,
+    formatPhone,
+    formatCEP,
+    isValidCPF,
+    isValidCNPJ,
+    generateCode,
+    generateShortId,
+    removeDuplicates,
+    groupBy,
+    sortBy,
+    createElement,
+    showLoading,
+    clearElement,
+    showToast,
+    saveToStorage,
+    loadFromStorage,
+    removeFromStorage,
+    exportToCSV,
+    downloadFile,
+    calculateAverage,
+    calculateTotal,
+    calculatePercentage,
+    debounce,
+    throttle
+};

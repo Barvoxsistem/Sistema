@@ -2,6 +2,18 @@
 // FUNÇÕES DE AUTENTICAÇÃO - BARVOX
 // ============================================
 
+import { auth, db, getUserUID, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where } from './firebase-config.js';
+import { 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut, 
+    sendPasswordResetEmail,
+    updateProfile,
+    reauthenticateWithCredential,
+    EmailAuthProvider,
+    deleteUser
+} from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+
 // ============================================
 // VALIDAÇÕES
 // ============================================
@@ -53,20 +65,20 @@ async function registerUser(username, email, password, phone) {
         }
 
         // Verificar se username já existe
-        const usernameExists = await db.collection('users')
-            .where('username', '==', username.toLowerCase())
-            .get();
+        const usernameExists = await getDocs(
+            query(collection(db, 'users'), where('username', '==', username.toLowerCase()))
+        );
 
         if (!usernameExists.empty) {
             throw new Error('Nome de usuário já existe');
         }
 
         // Criar usuário no Firebase Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
 
         // Salvar dados do usuário no Firestore
-        await db.collection('users').doc(uid).set({
+        await setDoc(doc(db, 'users', uid), {
             username: username.toLowerCase(),
             email: email,
             phone: phone,
@@ -94,9 +106,9 @@ async function registerUser(username, email, password, phone) {
 async function loginUser(username, password) {
     try {
         // Buscar usuário pelo username
-        const userSnapshot = await db.collection('users')
-            .where('username', '==', username.toLowerCase())
-            .get();
+        const userSnapshot = await getDocs(
+            query(collection(db, 'users'), where('username', '==', username.toLowerCase()))
+        );
 
         if (userSnapshot.empty) {
             throw new Error('Usuário não encontrado');
@@ -106,7 +118,7 @@ async function loginUser(username, password) {
         const email = userData.email;
 
         // Fazer login com email e senha
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
         
         console.log('Login realizado com sucesso:', userCredential.user.uid);
         return { success: true, uid: userCredential.user.uid };
@@ -131,7 +143,7 @@ async function loginUser(username, password) {
 
 async function logoutUser() {
     try {
-        await auth.signOut();
+        await signOut(auth);
         console.log('Logout realizado com sucesso');
         return { success: true };
     } catch (error) {
@@ -150,7 +162,7 @@ async function resetPassword(email) {
             throw new Error('Email inválido');
         }
 
-        await auth.sendPasswordResetEmail(email);
+        await sendPasswordResetEmail(auth, email);
         console.log('Email de recuperação enviado para:', email);
         return { success: true };
 
@@ -171,7 +183,7 @@ async function updateUserProfile(displayName) {
             throw new Error('Usuário não autenticado');
         }
 
-        await user.updateProfile({
+        await updateProfile(user, {
             displayName: displayName
         });
 
@@ -195,8 +207,8 @@ async function getUserData() {
             throw new Error('Usuário não autenticado');
         }
 
-        const userDoc = await db.collection('users').doc(uid).get();
-        if (!userDoc.exists) {
+        const userDoc = await getDoc(doc(db, 'users', uid));
+        if (!userDoc.exists()) {
             throw new Error('Dados do usuário não encontrados');
         }
 
@@ -219,7 +231,7 @@ async function updateUserData(userData) {
             throw new Error('Usuário não autenticado');
         }
 
-        await db.collection('users').doc(uid).update(userData);
+        await updateDoc(doc(db, 'users', uid), userData);
         console.log('Dados do usuário atualizados');
         return { success: true };
 
@@ -241,18 +253,18 @@ async function deleteUserAccount(password) {
         }
 
         // Re-autenticar o usuário
-        const credential = firebase.auth.EmailAuthProvider.credential(
+        const credential = EmailAuthProvider.credential(
             user.email,
             password
         );
-        await user.reauthenticateWithCredential(credential);
+        await reauthenticateWithCredential(user, credential);
 
         // Deletar dados do Firestore
         const uid = user.uid;
-        await db.collection('users').doc(uid).delete();
+        await deleteDoc(doc(db, 'users', uid));
 
         // Deletar usuário do Firebase Auth
-        await user.delete();
+        await deleteUser(user);
 
         console.log('Conta deletada com sucesso');
         return { success: true };
@@ -269,9 +281,9 @@ async function deleteUserAccount(password) {
 
 async function checkUsernameExists(username) {
     try {
-        const userSnapshot = await db.collection('users')
-            .where('username', '==', username.toLowerCase())
-            .get();
+        const userSnapshot = await getDocs(
+            query(collection(db, 'users'), where('username', '==', username.toLowerCase()))
+        );
 
         return { exists: !userSnapshot.empty };
 
@@ -287,9 +299,9 @@ async function checkUsernameExists(username) {
 
 async function checkEmailExists(email) {
     try {
-        const userSnapshot = await db.collection('users')
-            .where('email', '==', email)
-            .get();
+        const userSnapshot = await getDocs(
+            query(collection(db, 'users'), where('email', '==', email))
+        );
 
         return { exists: !userSnapshot.empty };
 
@@ -298,3 +310,17 @@ async function checkEmailExists(email) {
         return { exists: false, error: error.message };
     }
 }
+
+// Exportar funções para uso em outros módulos
+export { 
+    registerUser, 
+    loginUser, 
+    logoutUser, 
+    resetPassword, 
+    updateUserProfile, 
+    getUserData, 
+    updateUserData, 
+    deleteUserAccount, 
+    checkUsernameExists, 
+    checkEmailExists 
+};

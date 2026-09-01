@@ -3,6 +3,9 @@
  * Handles report generation and export
  */
 
+import { db, auth } from './firebase-config.js';
+import { formatCurrency, formatDate, exportToCSV } from './utils.js';
+
 let currentReportType = '';
 let currentReportFormat = '';
 

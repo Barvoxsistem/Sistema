@@ -2,6 +2,9 @@
 // DASHBOARD - BARVOX
 // ============================================
 
+import { db, isUserAuthenticated, getUserUID, collection, doc, getDoc, getDocs, query, where, orderBy, limit } from './firebase-config.js';
+import { getUserData } from './auth.js';
+
 let currentUserData = null;
 let chartsInstance = {};
 
@@ -69,13 +72,14 @@ async function loadKPIs() {
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
         // Calcular receitas (vendas)
-        const salesSnapshot = await db.collection('sales')
-            .doc(uid)
-            .collection('sales')
-            .where('createdAt', '>=', monthStart)
-            .where('createdAt', '<=', monthEnd)
-            .where('status', '==', 'paid')
-            .get();
+        const salesSnapshot = await getDocs(
+            query(
+                collection(db, 'sales', uid, 'sales'),
+                where('createdAt', '>=', monthStart),
+                where('createdAt', '<=', monthEnd),
+                where('status', '==', 'paid')
+            )
+        );
 
         let totalRevenue = 0;
         salesSnapshot.forEach(doc => {
@@ -83,13 +87,14 @@ async function loadKPIs() {
         });
 
         // Calcular custos (compras)
-        const purchasesSnapshot = await db.collection('purchases')
-            .doc(uid)
-            .collection('purchases')
-            .where('createdAt', '>=', monthStart)
-            .where('createdAt', '<=', monthEnd)
-            .where('status', '==', 'paid')
-            .get();
+        const purchasesSnapshot = await getDocs(
+            query(
+                collection(db, 'purchases', uid, 'purchases'),
+                where('createdAt', '>=', monthStart),
+                where('createdAt', '<=', monthEnd),
+                where('status', '==', 'paid')
+            )
+        );
 
         let totalCosts = 0;
         purchasesSnapshot.forEach(doc => {
@@ -321,12 +326,13 @@ async function loadRecentSales() {
 
         if (!tbody) return;
 
-        const salesSnapshot = await db.collection('sales')
-            .doc(uid)
-            .collection('sales')
-            .orderBy('createdAt', 'desc')
-            .limit(5)
-            .get();
+        const salesSnapshot = await getDocs(
+            query(
+                collection(db, 'sales', uid, 'sales'),
+                orderBy('createdAt', 'desc'),
+                limit(5)
+            )
+        );
 
         if (salesSnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="5" class="empty-message">Nenhuma venda registrada</td></tr>';
@@ -364,13 +370,14 @@ async function loadAccountsReceivable() {
 
         if (!tbody) return;
 
-        const accountsSnapshot = await db.collection('accounts_receivable')
-            .doc(uid)
-            .collection('accounts')
-            .where('status', '==', 'pending')
-            .orderBy('due_date', 'asc')
-            .limit(5)
-            .get();
+        const accountsSnapshot = await getDocs(
+            query(
+                collection(db, 'accounts_receivable', uid, 'accounts'),
+                where('status', '==', 'pending'),
+                orderBy('due_date', 'asc'),
+                limit(5)
+            )
+        );
 
         if (accountsSnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="4" class="empty-message">Nenhuma conta a receber</td></tr>';
@@ -408,13 +415,14 @@ async function loadAccountsPayable() {
 
         if (!tbody) return;
 
-        const accountsSnapshot = await db.collection('accounts_payable')
-            .doc(uid)
-            .collection('accounts')
-            .where('status', '==', 'pending')
-            .orderBy('due_date', 'asc')
-            .limit(5)
-            .get();
+        const accountsSnapshot = await getDocs(
+            query(
+                collection(db, 'accounts_payable', uid, 'accounts'),
+                where('status', '==', 'pending'),
+                orderBy('due_date', 'asc'),
+                limit(5)
+            )
+        );
 
         if (accountsSnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="4" class="empty-message">Nenhuma conta a pagar</td></tr>';
@@ -452,12 +460,13 @@ async function loadLowStock() {
 
         if (!tbody) return;
 
-        const productsSnapshot = await db.collection('products')
-            .doc(uid)
-            .collection('products')
-            .orderBy('stock', 'asc')
-            .limit(5)
-            .get();
+        const productsSnapshot = await getDocs(
+            query(
+                collection(db, 'products', uid, 'products'),
+                orderBy('stock', 'asc'),
+                limit(5)
+            )
+        );
 
         if (productsSnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="4" class="empty-message">Nenhum produto com estoque baixo</td></tr>';

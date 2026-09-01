@@ -2,6 +2,10 @@
 // LOGIC DE LOGIN E CADASTRO - BARVOX
 // ============================================
 
+import { registerUser, loginUser } from './auth.js';
+import { auth } from './firebase-config.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // Elementos do DOM
     const loginForm = document.getElementById('loginForm');
@@ -138,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================
 
 // Se o usuário já está logado, redirecionar para dashboard
-auth.onAuthStateChanged((user) => {
+onAuthStateChanged(auth, (user) => {
     if (user && (window.location.pathname.includes('index.html') || window.location.pathname.endsWith('/'))) {
         window.location.href = 'dashboard.html';
     }

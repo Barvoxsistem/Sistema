@@ -3,6 +3,10 @@
  * Handles accounts payable, receivable, and payment management
  */
 
+import { db, auth, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy } from './firebase-config.js';
+import { getUserData } from './auth.js';
+import { formatCurrency, formatDate, showToast, generateCode } from './utils.js';
+
 // ============================================
 // CONTAS A PAGAR - FINANCEIRO-PAGAR.HTML
 // ============================================
@@ -13,11 +17,9 @@ async function loadAccountsPayable() {
 
     try {
         const userData = await getUserData();
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_payable')
-            .orderBy('due_date', 'desc')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'accounts_payable'), orderBy('due_date', 'desc'))
+        );
 
         const tbody = document.getElementById('contasTable');
         tbody.innerHTML = '';
@@ -48,7 +50,7 @@ async function loadAccountsPayable() {
                 <td>${dias > 0 ? dias + ' dias' : 'Vencida'}</td>
                 <td>
                     <button class="action-btn edit" onclick="openPagamentoModal('${doc.id}', '${conta.supplier_name}', ${conta.valor})">✏️</button>
-                    <button class="action-btn delete" onclick="cancelarPagamento('${doc.id}')">🗑️</button>
+                    <button class="action-btn delete" onclick="deletarConta('${doc.id}')">🗑️</button>
                 </td>
             `;
             tbody.appendChild(row);
@@ -67,13 +69,9 @@ async function openPagamentoModal(contaId, fornecedor, valorTotal) {
     if (!user) return;
 
     try {
-        const contaDoc = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_payable')
-            .doc(contaId)
-            .get();
+        const contaDoc = await getDoc(doc(db, 'users', user.uid, 'accounts_payable', contaId));
 
-        if (!contaDoc.exists) return;
+        if (!contaDoc.exists()) return;
 
         const conta = contaDoc.data();
 
@@ -111,18 +109,14 @@ async function registrarPagamento(contaId, valor) {
     }
 
     try {
-        const contaRef = db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_payable')
-            .doc(contaId);
-
-        const contaDoc = await contaRef.get();
+        const contaRef = doc(db, 'users', user.uid, 'accounts_payable', contaId);
+        const contaDoc = await getDoc(contaRef);
         const conta = contaDoc.data();
 
         const novoPago = (conta.paid_value || 0) + valor;
         const status = novoPago >= conta.valor ? 'paid' : 'pending';
 
-        await contaRef.update({
+        await updateDoc(contaRef, {
             paid_value: novoPago,
             status: status,
             last_payment_date: new Date().toISOString().split('T')[0],
@@ -130,17 +124,14 @@ async function registrarPagamento(contaId, valor) {
         });
 
         // Registrar no histórico de pagamentos
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('payments_history')
-            .add({
-                account_id: contaId,
-                tipo: 'pagamento',
-                valor: valor,
-                data: new Date().toISOString().split('T')[0],
-                observacoes: document.getElementById('recObservacoes').value,
-                created_at: new Date().toISOString()
-            });
+        await addDoc(collection(db, 'users', user.uid, 'payments_history'), {
+            account_id: contaId,
+            tipo: 'pagamento',
+            valor: valor,
+            data: new Date().toISOString().split('T')[0],
+            observacoes: document.getElementById('recObservacoes').value,
+            created_at: new Date().toISOString()
+        });
 
         showToast('Pagamento registrado com sucesso', 'success');
     } catch (error) {
@@ -156,11 +147,7 @@ async function cancelarPagamento(contaId) {
     if (!user) return;
 
     try {
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_payable')
-            .doc(contaId)
-            .update({ status: 'cancelled' });
+        await updateDoc(doc(db, 'users', user.uid, 'accounts_payable', contaId), { status: 'cancelled' });
 
         showToast('Conta cancelada com sucesso', 'success');
         loadAccountsPayable();
@@ -179,12 +166,13 @@ async function loadPaidAccounts() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_payable')
-            .where('status', '==', 'paid')
-            .orderBy('last_payment_date', 'desc')
-            .get();
+        const snapshot = await getDocs(
+            query(
+                collection(db, 'users', user.uid, 'accounts_payable'),
+                where('status', '==', 'paid'),
+                orderBy('last_payment_date', 'desc')
+            )
+        );
 
         const tbody = document.getElementById('contasTable');
         tbody.innerHTML = '';
@@ -224,13 +212,9 @@ async function openDetalhesPagas(contaId) {
     if (!user) return;
 
     try {
-        const contaDoc = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_payable')
-            .doc(contaId)
-            .get();
+        const contaDoc = await getDoc(doc(db, 'users', user.uid, 'accounts_payable', contaId));
 
-        if (!contaDoc.exists) return;
+        if (!contaDoc.exists()) return;
 
         const conta = contaDoc.data();
         const modal = document.getElementById('detalhesModal');
@@ -257,11 +241,9 @@ async function loadAccountsReceivable() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_receivable')
-            .orderBy('due_date', 'desc')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'accounts_receivable'), orderBy('due_date', 'desc'))
+        );
 
         const tbody = document.getElementById('contasTable');
         tbody.innerHTML = '';
@@ -311,13 +293,9 @@ async function openRecebimentoModal(contaId, cliente, valorTotal) {
     if (!user) return;
 
     try {
-        const contaDoc = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_receivable')
-            .doc(contaId)
-            .get();
+        const contaDoc = await getDoc(doc(db, 'users', user.uid, 'accounts_receivable', contaId));
 
-        if (!contaDoc.exists) return;
+        if (!contaDoc.exists()) return;
 
         const conta = contaDoc.data();
 
@@ -355,18 +333,14 @@ async function registrarRecebimento(contaId, valor) {
     }
 
     try {
-        const contaRef = db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_receivable')
-            .doc(contaId);
-
-        const contaDoc = await contaRef.get();
+        const contaRef = doc(db, 'users', user.uid, 'accounts_receivable', contaId);
+        const contaDoc = await getDoc(contaRef);
         const conta = contaDoc.data();
 
         const novoRecebido = (conta.received_value || 0) + valor;
         const status = novoRecebido >= conta.valor ? 'received' : 'pending';
 
-        await contaRef.update({
+        await updateDoc(contaRef, {
             received_value: novoRecebido,
             status: status,
             last_receipt_date: new Date().toISOString().split('T')[0],
@@ -374,17 +348,14 @@ async function registrarRecebimento(contaId, valor) {
         });
 
         // Registrar no histórico de recebimentos
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('receipts_history')
-            .add({
-                account_id: contaId,
-                tipo: 'recebimento',
-                valor: valor,
-                data: new Date().toISOString().split('T')[0],
-                observacoes: document.getElementById('recObservacoes').value,
-                created_at: new Date().toISOString()
-            });
+        await addDoc(collection(db, 'users', user.uid, 'receipts_history'), {
+            account_id: contaId,
+            tipo: 'recebimento',
+            valor: valor,
+            data: new Date().toISOString().split('T')[0],
+            observacoes: document.getElementById('recObservacoes').value,
+            created_at: new Date().toISOString()
+        });
 
         showToast('Recebimento registrado com sucesso', 'success');
     } catch (error) {
@@ -400,11 +371,7 @@ async function cancelarRecebimento(contaId) {
     if (!user) return;
 
     try {
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_receivable')
-            .doc(contaId)
-            .update({ status: 'cancelled' });
+        await updateDoc(doc(db, 'users', user.uid, 'accounts_receivable', contaId), { status: 'cancelled' });
 
         showToast('Conta cancelada com sucesso', 'success');
         loadAccountsReceivable();
@@ -423,12 +390,13 @@ async function loadReceivedAccounts() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_receivable')
-            .where('status', '==', 'received')
-            .orderBy('last_receipt_date', 'desc')
-            .get();
+        const snapshot = await getDocs(
+            query(
+                collection(db, 'users', user.uid, 'accounts_receivable'),
+                where('status', '==', 'received'),
+                orderBy('last_receipt_date', 'desc')
+            )
+        );
 
         const tbody = document.getElementById('contasTable');
         tbody.innerHTML = '';
@@ -468,13 +436,9 @@ async function openDetalhesRecebidas(contaId) {
     if (!user) return;
 
     try {
-        const contaDoc = await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_receivable')
-            .doc(contaId)
-            .get();
+        const contaDoc = await getDoc(doc(db, 'users', user.uid, 'accounts_receivable', contaId));
 
-        if (!contaDoc.exists) return;
+        if (!contaDoc.exists()) return;
 
         const conta = contaDoc.data();
         const modal = document.getElementById('detalhesModal');

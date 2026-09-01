@@ -3,6 +3,9 @@
  * Handles sales, sales history, and quotations
  */
 
+import { db, auth, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy } from './firebase-config.js';
+import { formatCurrency, formatDate, showToast, generateCode } from './utils.js';
+
 let vendaItensTemp = [];
 
 // ============================================
@@ -14,11 +17,9 @@ async function loadVendaClientes() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('clients')
-            .orderBy('name')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'clients'), orderBy('name'))
+        );
 
         const select = document.getElementById('vendaCliente');
         if (!select) return;
@@ -217,52 +218,42 @@ async function registrarVenda() {
         const codigo = generateCode('VEND');
 
         // Registrar venda
-        const vendaDoc = await db.collection('users')
-            .doc(user.uid)
-            .collection('sales')
-            .add({
-                codigo,
-                client_id: clienteId,
-                client_name: clienteNome,
-                items: vendaItensTemp,
-                subtotal,
-                desconto,
-                frete,
-                total,
-                payment_method: pagamentoEl.value,
-                status: 'pending',
-                data: dataEl.value,
-                created_at: new Date().toISOString()
-            });
+        const vendaDoc = await addDoc(collection(db, 'users', user.uid, 'sales'), {
+            codigo,
+            client_id: clienteId,
+            client_name: clienteNome,
+            items: vendaItensTemp,
+            subtotal,
+            desconto,
+            frete,
+            total,
+            payment_method: pagamentoEl.value,
+            status: 'pending',
+            data: dataEl.value,
+            created_at: new Date().toISOString()
+        });
 
         // Criar conta a receber automaticamente
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('accounts_receivable')
-            .add({
-                codigo: 'AR-' + codigo,
-                sale_id: vendaDoc.id,
-                client_id: clienteId,
-                client_name: clienteNome,
-                valor: total,
-                due_date: dataEl.value,
-                status: 'pending',
-                received_value: 0,
-                payment_method: pagamentoEl.value,
-                created_at: new Date().toISOString()
-            });
+        await addDoc(collection(db, 'users', user.uid, 'accounts_receivable'), {
+            codigo: 'AR-' + codigo,
+            sale_id: vendaDoc.id,
+            client_id: clienteId,
+            client_name: clienteNome,
+            valor: total,
+            due_date: dataEl.value,
+            status: 'pending',
+            received_value: 0,
+            payment_method: pagamentoEl.value,
+            created_at: new Date().toISOString()
+        });
 
         // Atualizar estoque dos produtos
         for (const item of vendaItensTemp) {
-            const produtoRef = db.collection('users')
-                .doc(user.uid)
-                .collection('products')
-                .doc(item.produtoId);
-
-            const produtoDoc = await produtoRef.get();
-            if (produtoDoc.exists) {
+            const produtoRef = doc(db, 'users', user.uid, 'products', item.produtoId);
+            const produtoDoc = await getDoc(produtoRef);
+            if (produtoDoc.exists()) {
                 const estoque = produtoDoc.data().estoque_atual || 0;
-                await produtoRef.update({
+                await updateDoc(produtoRef, {
                     estoque_atual: Math.max(0, estoque - item.quantidade)
                 });
             }
@@ -291,11 +282,9 @@ async function loadSalesHistory() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('sales')
-            .orderBy('data', 'desc')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'sales'), orderBy('data', 'desc'))
+        );
 
         const tbody = document.getElementById('vendasTable');
         if (!tbody) return;
@@ -329,64 +318,6 @@ async function loadSalesHistory() {
             tbody.appendChild(row);
         });
     } catch (error) {
-        console.error('Erro ao carregar histórico de vendas:', error);
-        showToast('Erro ao carregar histórico', 'error');
-    }
-}
-
-async function openVendaDetalhes(vendaId) {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-        const vendaDoc = await db.collection('users')
-            .doc(user.uid)
-            .collection('sales')
-            .doc(vendaId)
-            .get();
-
-        if (!vendaDoc.exists) return;
-
-        const venda = vendaDoc.data();
-        const modal = document.getElementById('vendaModal');
-        if (!modal) return;
-
-        document.getElementById('detCodigo').textContent = venda.codigo;
-        document.getElementById('detCliente').textContent = venda.client_name;
-        document.getElementById('detData').textContent = formatDate(venda.data);
-        document.getElementById('detValor').textContent = formatCurrency(venda.total);
-        document.getElementById('detPagamento').textContent = venda.payment_method || '-';
-
-        const statusLabel = venda.status === 'paid' ? 'Paga' :
-            venda.status === 'cancelled' ? 'Cancelada' : 'Pendente';
-        document.getElementById('detStatus').textContent = statusLabel;
-
-        // Carregar produtos
-        const tbody = document.getElementById('detProdutos');
-        tbody.innerHTML = '';
-
-        if (venda.items && venda.items.length > 0) {
-            venda.items.forEach(item => {
-                const subtotal = (item.preco * item.quantidade) - (item.desconto || 0);
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${item.nome}</td>
-                    <td>${item.quantidade}</td>
-                    <td>${formatCurrency(item.preco)}</td>
-                    <td>${formatCurrency(subtotal)}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        modal.style.display = 'flex';
-    } catch (error) {
-        console.error('Erro ao abrir detalhes da venda:', error);
-        showToast('Erro ao abrir detalhes', 'error');
-    }
-}
-
-// ============================================
 // ORÇAMENTO - VENDAS-ORCAMENTO.HTML
 // ============================================
 
@@ -397,11 +328,9 @@ async function loadOrcClientes() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('clients')
-            .orderBy('name')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'clients'), orderBy('name'))
+        );
 
         const select = document.getElementById('orcCliente');
         if (!select) return;
@@ -425,11 +354,9 @@ async function loadOrcProdutos() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('products')
-            .orderBy('name')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'products'), orderBy('name'))
+        );
 
         const select = document.getElementById('orcProduto');
         if (!select) return;
@@ -599,23 +526,20 @@ async function registrarOrcamento() {
         dataValidade.setDate(dataValidade.getDate() + parseInt(validadeEl.value));
         const dataValidadeStr = dataValidade.toISOString().split('T')[0];
 
-        await db.collection('users')
-            .doc(user.uid)
-            .collection('quotations')
-            .add({
-                codigo,
-                client_id: clienteId,
-                client_name: clienteNome,
-                items: orcamentoItensTemp,
-                subtotal,
-                desconto,
-                total,
-                data: dataEl.value,
-                data_validade: dataValidadeStr,
-                observacoes: document.getElementById('orcObservacoes')?.value || '',
-                status: 'pending',
-                created_at: new Date().toISOString()
-            });
+        await addDoc(collection(db, 'users', user.uid, 'quotations'), {
+            codigo,
+            client_id: clienteId,
+            client_name: clienteNome,
+            items: orcamentoItensTemp,
+            subtotal,
+            desconto,
+            total,
+            data: dataEl.value,
+            data_validade: dataValidadeStr,
+            observacoes: document.getElementById('orcObservacoes')?.value || '',
+            status: 'pending',
+            created_at: new Date().toISOString()
+        });
 
         showToast('Orçamento registrado com sucesso!', 'success');
 
@@ -636,11 +560,9 @@ async function loadOrcamentos() {
     if (!user) return;
 
     try {
-        const snapshot = await db.collection('users')
-            .doc(user.uid)
-            .collection('quotations')
-            .orderBy('data', 'desc')
-            .get();
+        const snapshot = await getDocs(
+            query(collection(db, 'users', user.uid, 'quotations'), orderBy('data', 'desc'))
+        );
 
         const tbody = document.getElementById('orcamentosTable');
         if (!tbody) return;
@@ -655,22 +577,21 @@ async function loadOrcamentos() {
         snapshot.forEach(doc => {
             const orc = doc.data();
             const statusClass = orc.status === 'approved' ? 'status-completed' :
-                orc.status === 'rejected' ? 'status-cancelled' :
-                orc.status === 'expired' ? 'status-overdue' : 'status-pending';
+                orc.status === 'rejected' ? 'status-cancelled' : 'status-pending';
             const statusLabel = orc.status === 'approved' ? 'Aprovado' :
-                orc.status === 'rejected' ? 'Recusado' :
-                orc.status === 'expired' ? 'Expirado' : 'Pendente';
+                orc.status === 'rejected' ? 'Rejeitado' : 'Pendente';
 
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${orc.codigo}</td>
                 <td>${orc.client_name}</td>
-                <td>${formatDate(orc.data)}</td>
                 <td>${formatCurrency(orc.total)}</td>
-                <td>${orc.data_validade.substring(0, 10)} (${document.getElementById('orcValidade')?.value || 30} dias)</td>
+                <td>${formatDate(orc.data)}</td>
+                <td>${formatDate(orc.data_validade)}</td>
                 <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
                 <td>
-                    <button class="action-btn edit" onclick="editarOrcamento('${doc.id}')">✏️</button>
+                    <button class="action-btn edit" onclick="openOrcDetalhes('${doc.id}')">👁️</button>
+                    <button class="action-btn delete" onclick="deletarOrcamento('${doc.id}')">🗑️</button>
                 </td>
             `;
             tbody.appendChild(row);

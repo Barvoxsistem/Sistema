@@ -3,6 +3,10 @@
 // ============================================
 // IMPORTANTE: Substitua os valores abaixo com suas credenciais reais do Firebase
 
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
 const firebaseConfig = {
     apiKey: "AIzaSyCSY5_utLe785zRdsANqMnuRquhaz3hgrI",
     authDomain: "barvoxjmejoaopedro.firebaseapp.com",
@@ -14,17 +18,17 @@ const firebaseConfig = {
 };
 
 // Inicializar Firebase
-firebase.initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 
 // Referências dos serviços
-const auth = firebase.auth();
-const db = firebase.firestore();
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Configuração de usuário autenticado
 let currentUser = null;
 
 // Listener para mudanças de autenticação
-auth.onAuthStateChanged((user) => {
+onAuthStateChanged(auth, (user) => {
     currentUser = user;
     if (user) {
         console.log('Usuário autenticado:', user.email);
@@ -65,6 +69,28 @@ function getUserUID() {
 function getUserEmail() {
     return currentUser ? currentUser.email : null;
 }
+
+// Exportar para uso em outros módulos
+export { 
+    auth, 
+    db, 
+    getCurrentUser, 
+    isUserAuthenticated, 
+    getUserUID, 
+    getUserEmail,
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    addDoc,
+    query,
+    where,
+    orderBy,
+    limit
+};
 
 // ============================================
 // ESTRUTURA DO FIRESTORE

@@ -175,15 +175,8 @@
         </div>
     </main>
 
-    <!-- Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+    <!-- Scripts como módulos ES6 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-    <script src="firebase-config.js"></script>
-    <script src="auth.js"></script>
-    <script src="utils.js"></script>
     <script>
         // Carregar menu lateral
         fetch('menu-lateral.html')
@@ -195,7 +188,7 @@
                 }
             });
     </script>
-    <script src="dashboard.js"></script>
+    <script type="module" src="dashboard.js"></script>
 </body>
 
 </html>
